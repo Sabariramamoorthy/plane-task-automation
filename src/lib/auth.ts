@@ -6,9 +6,47 @@ import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 
+function normalizeUrl(url: string) {
+  return url.replace(/\/$/, "");
+}
+
+function getAppBaseUrl() {
+  const explicit = process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL;
+  if (explicit && !explicit.includes("localhost")) {
+    return normalizeUrl(explicit);
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return normalizeUrl(explicit ?? "http://localhost:3000");
+}
+
+function getTrustedOrigins() {
+  const origins = new Set<string>([
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:*",
+    "https://*.vercel.app",
+  ]);
+
+  for (const url of [
+    process.env.BETTER_AUTH_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined,
+    process.env.VERCEL_BRANCH_URL ? `https://${process.env.VERCEL_BRANCH_URL}` : undefined,
+    process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : undefined,
+  ]) {
+    if (url) origins.add(normalizeUrl(url));
+  }
+
+  return [...origins];
+}
+
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,
-  baseURL: process.env.BETTER_AUTH_URL,
+  baseURL: getAppBaseUrl(),
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: {
@@ -36,13 +74,7 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 24 * 7,
     updateAge: 60 * 60 * 24,
   },
-  trustedOrigins: [
-    process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
-    process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://localhost:*",
-  ],
+  trustedOrigins: getTrustedOrigins(),
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
       if (ctx.path !== "/sign-in/email") return;
