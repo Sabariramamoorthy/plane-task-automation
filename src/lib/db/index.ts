@@ -1,23 +1,47 @@
 import "server-only";
 import { drizzle } from "drizzle-orm/postgres-js";
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 
+type Db = PostgresJsDatabase<typeof schema>;
+
 const globalForDb = globalThis as unknown as {
   client: ReturnType<typeof postgres> | undefined;
+  db: Db | undefined;
 };
 
-function createClient() {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error("DATABASE_URL is not set");
+function getClient() {
+  if (!globalForDb.client) {
+    const url = process.env.DATABASE_URL;
+    if (!url) {
+      throw new Error("DATABASE_URL is not set");
+    }
+    globalForDb.client = postgres(url, { prepare: false });
   }
-  return postgres(url, { prepare: false });
+  return globalForDb.client;
 }
 
-export const client = globalForDb.client ?? createClient();
-if (process.env.NODE_ENV !== "production") {
-  globalForDb.client = client;
+function getDb(): Db {
+  if (!globalForDb.db) {
+    globalForDb.db = drizzle(getClient(), { schema });
+  }
+  return globalForDb.db;
 }
 
-export const db = drizzle(client, { schema });
+function createLazyProxy<T extends object>(getInstance: () => T): T {
+  return new Proxy({} as T, {
+    get(_target, prop, receiver) {
+      const instance = getInstance();
+      const value = Reflect.get(instance, prop, receiver);
+      if (typeof value === "function") {
+        return value.bind(instance);
+      }
+      return value;
+    },
+  });
+}
+
+// Defer connection until first query so `next build` works without DATABASE_URL.
+export const client = createLazyProxy(getClient);
+export const db = createLazyProxy(getDb);
