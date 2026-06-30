@@ -17,7 +17,12 @@ function getClient() {
     if (!url) {
       throw new Error("DATABASE_URL is not set");
     }
-    globalForDb.client = postgres(url, { prepare: false });
+    globalForDb.client = postgres(url, {
+      prepare: false,
+      max: 10,
+      idle_timeout: 20,
+      connect_timeout: 10,
+    });
   }
   return globalForDb.client;
 }
@@ -44,3 +49,12 @@ function createLazyProxy<T extends object>(getInstance: () => T): T {
 
 // Lazy init so `next build` works without DATABASE_URL; postgres-js works with Railway/Neon TCP.
 export const db = createLazyProxy(getDb);
+
+export async function warmDatabase() {
+  if (!process.env.DATABASE_URL) return;
+  try {
+    await getClient()`SELECT 1`;
+  } catch {
+    // Ignore warm-up failures during build or transient network errors.
+  }
+}

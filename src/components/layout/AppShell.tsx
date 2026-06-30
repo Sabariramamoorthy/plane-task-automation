@@ -3,46 +3,65 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Menu, X } from "lucide-react";
+import { History, LayoutGrid, Menu, Receipt, Server, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
-const links = [
-  { href: "/", label: "Wizard" },
-  { href: "/instances", label: "Instances" },
-  { href: "/history", label: "History" },
-  { href: "/billing", label: "Billing" },
-];
+type NavLink = {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  matchPrefix?: string;
+};
 
-function SidebarNav({
-  visibleLinks,
+function isLinkActive(pathname: string, href: string, matchPrefix?: string) {
+  if (href === "/") return pathname === "/";
+  if (matchPrefix) {
+    return pathname === href || pathname.startsWith(`${matchPrefix}/`);
+  }
+  return pathname === href;
+}
+
+function NavItem({
+  link,
   pathname,
   onNavigate,
 }: {
-  visibleLinks: Array<{ href: string; label: string }>;
+  link: NavLink;
   pathname: string;
   onNavigate?: () => void;
 }) {
+  const active = isLinkActive(pathname, link.href, link.matchPrefix);
+  const Icon = link.icon;
+
   return (
-    <nav className="flex-1 space-y-1 px-3 py-4">
-      {visibleLinks.map((link) => (
-        <Link
-          key={link.href}
-          href={link.href}
-          onClick={onNavigate}
-          className={cn(
-            "block rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
-            pathname === link.href
-              ? "bg-zinc-900 text-white"
-              : "text-zinc-700 hover:bg-zinc-100",
-          )}
-        >
-          {link.label}
-        </Link>
-      ))}
-    </nav>
+    <Link
+      href={link.href}
+      onClick={onNavigate}
+      className={cn(
+        "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+        active
+          ? "bg-zinc-100 text-zinc-900"
+          : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900",
+      )}
+    >
+      <Icon className={cn("h-4 w-4 shrink-0", active ? "text-zinc-900" : "text-zinc-400")} />
+      {link.label}
+    </Link>
   );
 }
+
+const mainLinks: NavLink[] = [
+  { href: "/", label: "Wizard", icon: Sparkles },
+  { href: "/instances", label: "Instances", icon: Server },
+  { href: "/history", label: "History", icon: History },
+  { href: "/billing", label: "Billing", icon: Receipt, matchPrefix: "/billing" },
+];
+
+const adminLinks: NavLink[] = [
+  { href: "/admin", label: "Dashboard", icon: LayoutGrid },
+  { href: "/admin/billing", label: "Invoices", icon: Receipt, matchPrefix: "/admin/billing" },
+];
 
 export function AppShell({
   isAdmin,
@@ -60,10 +79,6 @@ export function AppShell({
     setMenuPath(pathname);
     setMobileOpen(false);
   }
-
-  const visibleLinks = isAdmin
-    ? [...links, { href: "/admin", label: "Admin" }]
-    : links;
 
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? "hidden" : "";
@@ -102,20 +117,20 @@ export function AppShell({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-zinc-200 bg-white transition-transform duration-200 ease-out md:static md:z-auto md:w-64 md:max-w-none md:translate-x-0",
-          mobileOpen ? "translate-x-0" : "-translate-x-full",
+          "fixed inset-y-0 left-0 z-50 flex w-64 max-w-[85vw] flex-col border-r border-zinc-200 bg-white transition-transform duration-200 ease-out md:static md:z-auto md:translate-x-0",
+          mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
         )}
       >
-        <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-5 md:px-6">
+        <div className="flex items-center justify-between px-5 py-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
               Plane Automation
             </p>
-            <h1 className="mt-1 text-lg font-semibold text-zinc-950">Task Builder</h1>
+            <h1 className="mt-0.5 text-base font-semibold text-zinc-950">Task Builder</h1>
           </div>
           <button
             type="button"
-            className="rounded-md p-2 text-zinc-600 hover:bg-zinc-100 md:hidden"
+            className="rounded-md p-2 text-zinc-500 hover:bg-zinc-100 md:hidden"
             aria-label="Close navigation"
             onClick={() => setMobileOpen(false)}
           >
@@ -123,16 +138,39 @@ export function AppShell({
           </button>
         </div>
 
-        <SidebarNav
-          visibleLinks={visibleLinks}
-          pathname={pathname}
-          onNavigate={() => setMobileOpen(false)}
-        />
+        <nav className="flex-1 space-y-1 px-3">
+          {mainLinks.map((link) => (
+            <NavItem
+              key={link.href}
+              link={link}
+              pathname={pathname}
+              onNavigate={() => setMobileOpen(false)}
+            />
+          ))}
 
-        <div className="border-t border-zinc-200 p-4">
+          {isAdmin ? (
+            <div className="pt-4">
+              <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-widest text-zinc-400">
+                Admin
+              </p>
+              <div className="space-y-1">
+                {adminLinks.map((link) => (
+                  <NavItem
+                    key={link.href}
+                    link={link}
+                    pathname={pathname}
+                    onNavigate={() => setMobileOpen(false)}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </nav>
+
+        <div className="border-t border-zinc-100 p-3">
           <Button
             variant="outline"
-            className="w-full"
+            className="w-full text-zinc-600"
             onClick={handleSignOut}
             disabled={signingOut}
           >

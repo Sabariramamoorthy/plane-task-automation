@@ -2,7 +2,6 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { createAuthMiddleware, APIError } from "better-auth/api";
-import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 
@@ -73,27 +72,26 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 7,
     updateAge: 60 * 60 * 24,
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60,
+    },
   },
   trustedOrigins: getTrustedOrigins(),
   hooks: {
-    before: createAuthMiddleware(async (ctx) => {
+    after: createAuthMiddleware(async (ctx) => {
       if (ctx.path !== "/sign-in/email") return;
 
-      const email = ctx.body?.email;
-      if (typeof email !== "string" || !email.trim()) return;
+      const newSession = ctx.context.newSession;
+      if (!newSession?.user) return;
 
-      const existingUsers = await db
-        .select({ isActive: schema.user.isActive })
-        .from(schema.user)
-        .where(sql`lower(${schema.user.email}) = lower(${email.trim()})`)
-        .limit(1);
-      const existingUser = existingUsers[0];
+      const isActive = (newSession.user as { isActive?: boolean }).isActive;
+      if (isActive !== false) return;
 
-      if (existingUser && !existingUser.isActive) {
-        throw new APIError("FORBIDDEN", {
-          message: "Your account has been deactivated. Contact admin.",
-        });
-      }
+      await ctx.context.internalAdapter.deleteSession(newSession.session.token);
+      throw new APIError("FORBIDDEN", {
+        message: "Your account has been deactivated. Contact admin.",
+      });
     }),
   },
   plugins: [nextCookies()],

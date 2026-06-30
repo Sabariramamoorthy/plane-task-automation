@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 
@@ -210,9 +211,8 @@ export function InstanceSettingsForm({
               <Badge>Saved securely</Badge>
             ) : null}
           </div>
-          <Input
+          <PasswordInput
             id="apiKey"
-            type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             placeholder={

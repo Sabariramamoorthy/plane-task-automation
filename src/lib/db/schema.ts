@@ -7,6 +7,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
@@ -206,7 +207,7 @@ export const billingInvoices = pgTable(
     invoiceMonth: text("invoice_month").notNull(),
     totalRequests: integer("total_requests").notNull().default(0),
     totalEstimatedTokens: integer("total_estimated_tokens").notNull().default(0),
-    amountUsd: numeric("amount_usd", { precision: 10, scale: 2 })
+    amountUsd: numeric("amount_usd", { precision: 10, scale: 4 })
       .notNull()
       .default("0"),
     isPaid: boolean("is_paid").notNull().default(false),
@@ -218,6 +219,7 @@ export const billingInvoices = pgTable(
   (table) => [
     index("billing_invoices_user_id_idx").on(table.userId),
     index("billing_invoices_created_at_idx").on(table.createdAt),
+    uniqueIndex("billing_invoices_user_month_uidx").on(table.userId, table.invoiceMonth),
   ],
 );
 

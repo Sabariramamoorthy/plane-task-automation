@@ -1,6 +1,7 @@
 import "server-only";
 import { and, count, desc, eq, gte, lte, sql } from "drizzle-orm";
-import { getCurrentUsdToInrRate } from "@/lib/billing";
+import { getBillingMonthRange } from "@/lib/billing-month";
+import { billedUsdFromRawCost, getCurrentUsdToInrRate, inrFromUsd, resolveInvoiceFromUsage } from "@/lib/billing";
 import { db } from "@/lib/db";
 import {
   aiUsageLogs,
@@ -11,14 +12,8 @@ import {
   userUsageLimits,
 } from "@/lib/db/schema";
 
-function getMonthRange(date = new Date()) {
-  const start = new Date(date.getFullYear(), date.getMonth(), 1, 0, 0, 0, 0);
-  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);
-  return { start, end };
-}
-
 export async function getAdminDashboardData() {
-  const { start, end } = getMonthRange();
+  const { start, end } = getBillingMonthRange();
 
   const [
     totalUsersRow,
@@ -102,8 +97,9 @@ export async function getAdminDashboardData() {
       isBillingEnabled: usageLimit?.isBillingEnabled ?? true,
       monthUsageRequests: Number(usageRow?.totalRequests ?? 0),
       monthUsageTokens: Number(usageRow?.totalTokens ?? 0),
-      monthUsageInr: Number(
-        (Number(usageRow?.totalCostUsd ?? 0) * 1.5 * usdToInr).toFixed(2),
+      monthUsageInr: inrFromUsd(
+        billedUsdFromRawCost(Number(usageRow?.totalCostUsd ?? 0)),
+        usdToInr,
       ),
     };
   });
@@ -118,17 +114,22 @@ export async function getAdminDashboardData() {
       totalInvoicedInr: Number((Number(invoicedUsdRow[0]?.total ?? 0) * usdToInr).toFixed(2)),
     },
     users: usersWithMeta,
-    invoices: invoiceRows.map((row) => ({
-      id: row.invoice.id,
-      userId: row.invoice.userId,
-      invoiceMonth: row.invoice.invoiceMonth,
-      totalRequests: row.invoice.totalRequests,
-      totalEstimatedTokens: row.invoice.totalEstimatedTokens,
-      isPaid: row.invoice.isPaid,
-      paidAt: row.invoice.paidAt?.toISOString() ?? null,
-      amountInr: Number((Number(row.invoice.amountUsd) * usdToInr).toFixed(2)),
-      customer: row.customer,
-    })),
+    invoices: await Promise.all(
+      invoiceRows.map(async (row) => {
+        const monthUsage = await resolveInvoiceFromUsage(row.invoice.userId, row.invoice.invoiceMonth);
+        return {
+          id: row.invoice.id,
+          userId: row.invoice.userId,
+          invoiceMonth: row.invoice.invoiceMonth,
+          totalRequests: monthUsage.totalRequests,
+          totalEstimatedTokens: monthUsage.totalEstimatedTokens,
+          isPaid: row.invoice.isPaid,
+          paidAt: row.invoice.paidAt?.toISOString() ?? null,
+          amountInr: inrFromUsd(monthUsage.totalCostUsd, usdToInr),
+          customer: row.customer,
+        };
+      }),
+    ),
   };
 }
 
