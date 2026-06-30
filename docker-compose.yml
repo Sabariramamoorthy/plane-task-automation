@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: plane-task-automation-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: planeapp
+      POSTGRES_PASSWORD: planeapp
+      POSTGRES_DB: plane_task_automation
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/data
+
+volumes:
+  postgres_data:

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" fill="none">
+  <rect width="180" height="180" rx="40" fill="#18181b"/>
+  <path
+    d="M38 91 132 52 100 128 82 98 60 103 70 85 38 91Z"
+    fill="#fafafa"
+  />
+  <path
+    d="M82 98 100 128 89 102 82 98Z"
+    fill="#a1a1aa"
+  />
+</svg>
