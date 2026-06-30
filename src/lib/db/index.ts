@@ -1,30 +1,21 @@
 import "server-only";
-import { drizzle } from "drizzle-orm/postgres-js";
-import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import { neon } from "@neondatabase/serverless";
+import { drizzle, type NeonHttpDatabase } from "drizzle-orm/neon-http";
 import * as schema from "./schema";
 
-type Db = PostgresJsDatabase<typeof schema>;
+type Db = NeonHttpDatabase<typeof schema>;
 
 const globalForDb = globalThis as unknown as {
-  client: ReturnType<typeof postgres> | undefined;
   db: Db | undefined;
 };
 
-function getClient() {
-  if (!globalForDb.client) {
+function getDb(): Db {
+  if (!globalForDb.db) {
     const url = process.env.DATABASE_URL;
     if (!url) {
       throw new Error("DATABASE_URL is not set");
     }
-    globalForDb.client = postgres(url, { prepare: false });
-  }
-  return globalForDb.client;
-}
-
-function getDb(): Db {
-  if (!globalForDb.db) {
-    globalForDb.db = drizzle(getClient(), { schema });
+    globalForDb.db = drizzle(neon(url), { schema });
   }
   return globalForDb.db;
 }
@@ -42,6 +33,5 @@ function createLazyProxy<T extends object>(getInstance: () => T): T {
   });
 }
 
-// Defer connection until first query so `next build` works without DATABASE_URL.
-export const client = createLazyProxy(getClient);
+// HTTP driver + lazy init: fast on Vercel serverless, safe for `next build`.
 export const db = createLazyProxy(getDb);

@@ -1,4 +1,5 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { and, count, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { aiUsageLogs, billingInvoices, user, userUsageLimits } from "@/lib/db/schema";
@@ -10,7 +11,7 @@ const FX_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 let cachedUsdToInr: { value: number; expiresAt: number } | null = null;
 
-export async function getCurrentUsdToInrRate() {
+async function fetchUsdToInrRate() {
   if (cachedUsdToInr && Date.now() < cachedUsdToInr.expiresAt) {
     return cachedUsdToInr.value;
   }
@@ -34,6 +35,10 @@ export async function getCurrentUsdToInrRate() {
     return FALLBACK_USD_TO_INR;
   }
 }
+
+export const getCurrentUsdToInrRate = unstable_cache(fetchUsdToInrRate, ["usd-inr-rate"], {
+  revalidate: 21600,
+});
 
 function getMonthRange(date = new Date()) {
   const start = new Date(date.getFullYear(), date.getMonth(), 1, 0, 0, 0, 0);
@@ -91,25 +96,33 @@ export async function trackAiUsage(params: {
 }
 
 export async function getUserBillingOverview(userId: string) {
-  const usageLimit = await ensureUserUsageLimit(userId);
   const { start, end, monthId } = getMonthRange();
-  const usdToInrRate = await getCurrentUsdToInrRate();
 
-  const [usageRow] = await db
-    .select({
-      totalRequests: count(aiUsageLogs.id),
-      totalEstimatedTokens: sql<number>`coalesce(sum(${aiUsageLogs.estimatedTokens}), 0)`,
-      totalCostUsd: sql<string>`coalesce(sum(${aiUsageLogs.estimatedCostUsd}), 0)`,
-    })
-    .from(aiUsageLogs)
-    .where(and(eq(aiUsageLogs.userId, userId), gte(aiUsageLogs.createdAt, start), lte(aiUsageLogs.createdAt, end)));
+  const [usageLimit, usdToInrRate, usageRows, invoices] = await Promise.all([
+    ensureUserUsageLimit(userId),
+    getCurrentUsdToInrRate(),
+    db
+      .select({
+        totalRequests: count(aiUsageLogs.id),
+        totalEstimatedTokens: sql<number>`coalesce(sum(${aiUsageLogs.estimatedTokens}), 0)`,
+        totalCostUsd: sql<string>`coalesce(sum(${aiUsageLogs.estimatedCostUsd}), 0)`,
+      })
+      .from(aiUsageLogs)
+      .where(
+        and(
+          eq(aiUsageLogs.userId, userId),
+          gte(aiUsageLogs.createdAt, start),
+          lte(aiUsageLogs.createdAt, end),
+        ),
+      ),
+    db
+      .select()
+      .from(billingInvoices)
+      .where(eq(billingInvoices.userId, userId))
+      .orderBy(desc(billingInvoices.invoiceMonth), desc(billingInvoices.createdAt)),
+  ]);
 
-  const invoices = await db
-    .select()
-    .from(billingInvoices)
-    .where(eq(billingInvoices.userId, userId))
-    .orderBy(desc(billingInvoices.invoiceMonth), desc(billingInvoices.createdAt));
-
+  const usageRow = usageRows[0];
   const billedUsd = Number(usageRow?.totalCostUsd ?? 0) * BILLING_MULTIPLIER;
 
   return {
@@ -123,7 +136,13 @@ export async function getUserBillingOverview(userId: string) {
       totalCostInr: Number((billedUsd * usdToInrRate).toFixed(2)),
     },
     invoices: invoices.map((invoice) => ({
-      ...invoice,
+      id: invoice.id,
+      invoiceMonth: invoice.invoiceMonth,
+      totalRequests: invoice.totalRequests,
+      totalEstimatedTokens: invoice.totalEstimatedTokens,
+      isPaid: invoice.isPaid,
+      paidAt: invoice.paidAt?.toISOString() ?? null,
+      createdAt: invoice.createdAt.toISOString(),
       amountUsd: Number(invoice.amountUsd),
       amountInr: Number((Number(invoice.amountUsd) * usdToInrRate).toFixed(2)),
     })),

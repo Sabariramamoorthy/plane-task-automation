@@ -41,10 +41,14 @@ type CreateResult = {
 
 const steps = ["Select Instance", "Task Input", "Review & Assign", "Create"];
 
-export function TaskWizard() {
+type TaskWizardProps = {
+  initialInstances?: Instance[];
+};
+
+export function TaskWizard({ initialInstances = [] }: TaskWizardProps) {
   const [step, setStep] = useState(0);
-  const [instances, setInstances] = useState<Instance[]>([]);
-  const [instanceId, setInstanceId] = useState("");
+  const [instances, setInstances] = useState<Instance[]>(initialInstances);
+  const [instanceId, setInstanceId] = useState(initialInstances[0]?.id ?? "");
   const [rawInput, setRawInput] = useState("");
   const [batchId, setBatchId] = useState("");
   const [tasks, setTasks] = useState<ParsedTask[]>([]);
@@ -56,7 +60,16 @@ export function TaskWizard() {
   const [syncSummary, setSyncSummary] = useState({ modules: 0, assignees: 0 });
 
   useEffect(() => {
-    async function loadInstances() {
+    async function bootstrap() {
+      if (initialInstances.length > 0) {
+        try {
+          await loadInstanceData(initialInstances[0].id, false);
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : "Failed to load instance");
+        }
+        return;
+      }
+
       const response = await fetch("/api/plane/instances");
       const data = await response.json();
       if (data.success) {
@@ -68,7 +81,9 @@ export function TaskWizard() {
         }
       }
     }
-    loadInstances();
+    void bootstrap();
+    // Only run on mount; initialInstances come from the server render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const selectedInstance = instances.find((item) => item.id === instanceId);

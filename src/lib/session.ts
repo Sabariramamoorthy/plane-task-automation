@@ -1,8 +1,9 @@
 import "server-only";
+import { cache } from "react";
 import { redirect } from "next/navigation";
-import { getAppSession, getActiveSessionUser } from "@/lib/auth-session";
+import { getActiveSessionUser, getAppSession } from "@/lib/auth-session";
 
-export async function requireSession() {
+export const requireSession = cache(async () => {
   const session = await getAppSession();
   if (!session?.user) {
     redirect("/login");
@@ -14,4 +15,4 @@ export async function requireSession() {
   }
 
   return session;
-}
+});

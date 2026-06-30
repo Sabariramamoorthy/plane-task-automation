@@ -1,36 +1,10 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import { getActiveSessionUser } from "@/lib/auth-session";
+import { getHistoryForUser } from "@/lib/history-service";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-type HistoryData = {
-  batches: Array<{
-    id: string;
-    rawInput: string;
-    status: string;
-    createdAt: string;
-    instance: { name: string };
-  }>;
-  issues: Array<{
-    id: string;
-    taskName: string;
-    planeUrl: string | null;
-    error: string | null;
-    createdAt: string;
-  }>;
-};
-
-export default function HistoryPage() {
-  const [data, setData] = useState<HistoryData | null>(null);
-
-  useEffect(() => {
-    async function loadHistory() {
-      const response = await fetch("/api/history");
-      const json = await response.json();
-      if (json.success) setData(json.data);
-    }
-    loadHistory();
-  }, []);
+export default async function HistoryPage() {
+  const user = await getActiveSessionUser();
+  const data = user ? await getHistoryForUser(user.id) : { batches: [], issues: [] };
 
   return (
     <div className="space-y-6">
@@ -46,7 +20,7 @@ export default function HistoryPage() {
           <CardTitle>Created Issues</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {data?.issues.length ? (
+          {data.issues.length ? (
             data.issues.map((issue) => (
               <div key={issue.id} className="rounded-md border border-zinc-200 p-4 text-sm break-words">
                 <p className="font-medium break-words">{issue.taskName}</p>
@@ -79,7 +53,7 @@ export default function HistoryPage() {
           <CardDescription>Raw inputs sent to Groq.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {data?.batches.length ? (
+          {data.batches.length ? (
             data.batches.map((batch) => (
               <div key={batch.id} className="rounded-md border border-zinc-200 p-4 text-sm">
                 <p className="font-medium">{batch.instance.name}</p>

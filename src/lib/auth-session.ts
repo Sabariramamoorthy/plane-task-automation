@@ -35,7 +35,11 @@ export const getActiveSessionUser = cache(async () => {
   const session = await getAppSession();
   if (!session?.user) return null;
 
-  const active = await resolveIsActive(session.user as SessionUser);
+  const sessionUser = session.user as SessionUser;
+  if (sessionUser.isActive === false) return null;
+  if (sessionUser.isActive === true) return session.user;
+
+  const active = await resolveIsActive(sessionUser);
   if (!active) return null;
 
   return session.user;

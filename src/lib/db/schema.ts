@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   integer,
   jsonb,
   numeric,
@@ -22,18 +23,22 @@ export const user = pgTable("user", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const session = pgTable("session", {
-  id: text("id").primaryKey(),
-  expiresAt: timestamp("expires_at").notNull(),
-  token: text("token").notNull().unique(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-});
+export const session = pgTable(
+  "session",
+  {
+    id: text("id").primaryKey(),
+    expiresAt: timestamp("expires_at").notNull(),
+    token: text("token").notNull().unique(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (table) => [index("session_user_id_idx").on(table.userId)],
+);
 
 export const account = pgTable("account", {
   id: text("id").primaryKey(),
@@ -63,22 +68,26 @@ export const verification = pgTable("verification", {
 });
 
 // App tables
-export const planeInstances = pgTable("plane_instances", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  baseUrl: text("base_url").notNull(),
-  apiKeyEncrypted: text("api_key_encrypted").notNull(),
-  workspaceSlug: text("workspace_slug").notNull(),
-  projectId: text("project_id").notNull(),
-  defaultModuleId: text("default_module_id").notNull(),
-  apiPathStyle: text("api_path_style").notNull().default("issues"),
-  lastSyncedAt: timestamp("last_synced_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+export const planeInstances = pgTable(
+  "plane_instances",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    baseUrl: text("base_url").notNull(),
+    apiKeyEncrypted: text("api_key_encrypted").notNull(),
+    workspaceSlug: text("workspace_slug").notNull(),
+    projectId: text("project_id").notNull(),
+    defaultModuleId: text("default_module_id").notNull(),
+    apiPathStyle: text("api_path_style").notNull().default("issues"),
+    lastSyncedAt: timestamp("last_synced_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [index("plane_instances_user_id_idx").on(table.userId)],
+);
 
 export const planeModules = pgTable("plane_modules", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -104,39 +113,51 @@ export const planeAssignees = pgTable("plane_assignees", {
   syncedAt: timestamp("synced_at").notNull().defaultNow(),
 });
 
-export const taskBatches = pgTable("task_batches", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  instanceId: uuid("instance_id")
-    .notNull()
-    .references(() => planeInstances.id, { onDelete: "cascade" }),
-  rawInput: text("raw_input").notNull(),
-  groqOutputJson: jsonb("groq_output_json"),
-  status: text("status").notNull().default("parsed"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+export const taskBatches = pgTable(
+  "task_batches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    instanceId: uuid("instance_id")
+      .notNull()
+      .references(() => planeInstances.id, { onDelete: "cascade" }),
+    rawInput: text("raw_input").notNull(),
+    groqOutputJson: jsonb("groq_output_json"),
+    status: text("status").notNull().default("parsed"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("task_batches_user_id_created_at_idx").on(table.userId, table.createdAt),
+  ],
+);
 
-export const createdIssues = pgTable("created_issues", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  batchId: uuid("batch_id")
-    .notNull()
-    .references(() => taskBatches.id, { onDelete: "cascade" }),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  instanceId: uuid("instance_id")
-    .notNull()
-    .references(() => planeInstances.id, { onDelete: "cascade" }),
-  planeIssueId: text("plane_issue_id"),
-  taskName: text("task_name").notNull(),
-  assigneeIds: jsonb("assignee_ids").$type<string[]>().default([]),
-  moduleIds: jsonb("module_ids").$type<string[]>().default([]),
-  planeUrl: text("plane_url"),
-  error: text("error"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+export const createdIssues = pgTable(
+  "created_issues",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    batchId: uuid("batch_id")
+      .notNull()
+      .references(() => taskBatches.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    instanceId: uuid("instance_id")
+      .notNull()
+      .references(() => planeInstances.id, { onDelete: "cascade" }),
+    planeIssueId: text("plane_issue_id"),
+    taskName: text("task_name").notNull(),
+    assigneeIds: jsonb("assignee_ids").$type<string[]>().default([]),
+    moduleIds: jsonb("module_ids").$type<string[]>().default([]),
+    planeUrl: text("plane_url"),
+    error: text("error"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("created_issues_user_id_created_at_idx").on(table.userId, table.createdAt),
+  ],
+);
 
 export const userUsageLimits = pgTable("user_usage_limits", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -151,41 +172,54 @@ export const userUsageLimits = pgTable("user_usage_limits", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const aiUsageLogs = pgTable("ai_usage_logs", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  instanceId: uuid("instance_id").references(() => planeInstances.id, {
-    onDelete: "set null",
-  }),
-  operation: text("operation").notNull().default("task_parse"),
-  inputChars: integer("input_chars").notNull().default(0),
-  outputChars: integer("output_chars").notNull().default(0),
-  estimatedTokens: integer("estimated_tokens").notNull().default(0),
-  estimatedCostUsd: numeric("estimated_cost_usd", { precision: 10, scale: 4 })
-    .notNull()
-    .default("0"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+export const aiUsageLogs = pgTable(
+  "ai_usage_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    instanceId: uuid("instance_id").references(() => planeInstances.id, {
+      onDelete: "set null",
+    }),
+    operation: text("operation").notNull().default("task_parse"),
+    inputChars: integer("input_chars").notNull().default(0),
+    outputChars: integer("output_chars").notNull().default(0),
+    estimatedTokens: integer("estimated_tokens").notNull().default(0),
+    estimatedCostUsd: numeric("estimated_cost_usd", { precision: 10, scale: 4 })
+      .notNull()
+      .default("0"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("ai_usage_logs_user_id_created_at_idx").on(table.userId, table.createdAt),
+  ],
+);
 
-export const billingInvoices = pgTable("billing_invoices", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
-  invoiceMonth: text("invoice_month").notNull(),
-  totalRequests: integer("total_requests").notNull().default(0),
-  totalEstimatedTokens: integer("total_estimated_tokens").notNull().default(0),
-  amountUsd: numeric("amount_usd", { precision: 10, scale: 2 })
-    .notNull()
-    .default("0"),
-  isPaid: boolean("is_paid").notNull().default(false),
-  paidAt: timestamp("paid_at"),
-  notes: text("notes"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+export const billingInvoices = pgTable(
+  "billing_invoices",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    invoiceMonth: text("invoice_month").notNull(),
+    totalRequests: integer("total_requests").notNull().default(0),
+    totalEstimatedTokens: integer("total_estimated_tokens").notNull().default(0),
+    amountUsd: numeric("amount_usd", { precision: 10, scale: 2 })
+      .notNull()
+      .default("0"),
+    isPaid: boolean("is_paid").notNull().default(false),
+    paidAt: timestamp("paid_at"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (table) => [
+    index("billing_invoices_user_id_idx").on(table.userId),
+    index("billing_invoices_created_at_idx").on(table.createdAt),
+  ],
+);
 
 export const planeInstancesRelations = relations(planeInstances, ({ many, one }) => ({
   user: one(user, { fields: [planeInstances.userId], references: [user.id] }),

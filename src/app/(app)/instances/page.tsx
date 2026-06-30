@@ -11,7 +11,15 @@ export default async function InstancesPage() {
   const session = await requireSession();
 
   const instances = await db
-    .select()
+    .select({
+      id: planeInstances.id,
+      name: planeInstances.name,
+      baseUrl: planeInstances.baseUrl,
+      workspaceSlug: planeInstances.workspaceSlug,
+      projectId: planeInstances.projectId,
+      defaultModuleId: planeInstances.defaultModuleId,
+      lastSyncedAt: planeInstances.lastSyncedAt,
+    })
     .from(planeInstances)
     .where(eq(planeInstances.userId, session.user.id));
 

@@ -8,7 +8,7 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const session = await requireSession();
-  const admin = await isUserAdmin(session.user.id, session.user.email);
+  const admin = isUserAdmin(session.user.id, session.user.email);
 
-  return <AppShell isAdmin={admin}>{children}</AppShell>;
+  return <AppShell isAdmin={await admin}>{children}</AppShell>;
 }

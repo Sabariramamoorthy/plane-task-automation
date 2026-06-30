@@ -57,7 +57,22 @@ export async function getPlaneClientForInstance(
 }
 
 export function sanitizeInstance(
-  instance: typeof planeInstances.$inferSelect,
+  instance: Pick<
+    typeof planeInstances.$inferSelect,
+    | "id"
+    | "name"
+    | "baseUrl"
+    | "workspaceSlug"
+    | "projectId"
+    | "defaultModuleId"
+    | "lastSyncedAt"
+  > &
+    Partial<
+      Pick<
+        typeof planeInstances.$inferSelect,
+        "apiPathStyle" | "apiKeyEncrypted" | "createdAt" | "updatedAt"
+      >
+    >,
 ) {
   return {
     id: instance.id,
@@ -66,7 +81,7 @@ export function sanitizeInstance(
     workspaceSlug: instance.workspaceSlug,
     projectId: instance.projectId,
     defaultModuleId: instance.defaultModuleId,
-    apiPathStyle: instance.apiPathStyle,
+    apiPathStyle: instance.apiPathStyle ?? "issues",
     hasApiKey: Boolean(instance.apiKeyEncrypted),
     lastSyncedAt: instance.lastSyncedAt,
     createdAt: instance.createdAt,

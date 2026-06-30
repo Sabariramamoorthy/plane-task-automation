@@ -13,6 +13,7 @@
     "admin:seed": "tsx scripts/seed-admin.ts"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "@radix-ui/react-avatar": "^1.2.0",
     "@radix-ui/react-checkbox": "^1.3.5",
     "@radix-ui/react-dialog": "^1.1.17",
